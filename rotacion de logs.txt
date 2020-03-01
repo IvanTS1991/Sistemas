@@ -1,0 +1,346 @@
+------------------------------
+	rotacion de logs
+-------------------------------
+el demonio rsyslogd conforme registra mensajes (en ficheros)
+sino se controla el tamaño de estos ficheros van creciendo
+indefinidamente hasta poder llegar a colapsar el sistema
+de ficheros. Para evitarlo:
+
+	- el directorio /var <---- donde estan los LOG
+	  la montan en una particion a parte en la instalacion
+	  del sistema
+
+	- herramientas para hacer rotacion de logs
+	  Estas herramientas chequean los ficheros log y
+	  en funcion de su tamaño cuando alcanzan un tamaño MAX
+	  vacian dicho fichero y los mensajes q habia los pasan
+	  a otro fichero (una rotacion de ficheros)
+
+	   [] <--- /var/log/auth.log
+		cuando alcanza tamaño MAX (ej de 1M)
+
+	[...]==> /var/log/atuth.log.1 mensajes del fich.original
+	   [] <-- /var/log/auth.log vacio de nuevo
+		 cuando alcanza tamaño MAX (ej de 1M)
+
+	[...]==> /var/log/atuth.log.2 mensajes del fich.log.1
+	[...]==> /var/log/atuth.log.1 mensajes del fich.original
+	   [] <-- /var/log/auth.log vacio de nuevo
+
+ la herramienta q se suele utilizar por el sistema se llama
+	LOGROTATE <----- es un ejecutable
+			/usr/sbin/logrotate
+			q se lanza diariamente como tarea
+			programada del sistema por CRON
+
+			/etc/cron.daily <---- logrotate
+
+	esta tarea programada hace:
+
+		-crea en /var/lib/logrotate <--- status
+						fichero donde
+					apunta los LOG q rota
+					y fecha y hora en q los
+					ha rotado
+
+		-ejecutar logrotate de nuevo para ver si tiene
+		q hacer de nuevo rotacion de logs o no en la 
+		fecha y hora actual
+ 
+configuracion de logrotate
+--------------------------
+Por defecto se configura el funcionamiento de rotacion de los log en un fichero /etc <------ logrotate.conf
+				(man logrotate.conf)
+
+en el fichero aparecen reglas con este formato:
+
+  [comando_logrotate_GLOBAL]    <== conjunto de comandos q 
+  [comando_logrotate_2_GLOBAL]	  se aplican PARA TODOS los
+   ....				  ficheros LOG por defecto
+
+  /ruta/fichero_log
+  [/ruta/fichero_log_2]
+  [/ruta/fichero_log_3]
+  [...] {
+		comando_logrotate   <===conjunto de comandos
+		comando_logrotate	q se aplican para la
+		...			rotacion de esos LOGS
+	 }				machacan a los GLOBALES
+	
+
+comandos logrotate para la rotacion: (man logrotate.conf)
+---------------------------------------------------------
+ rotate numero <---- indica el numero de veces q se rotan los
+		 	LOG,a partir de ese numero se machacan
+			los mensajes del ultimo fichero
+
+  size tamaño[k,M,G]<---indica el tamaño MAX para rotar un fich
+			LOG
+  hourly,daily,weekly,monthly <---indica q la rotacion se produ
+				ce cada hora,cada dia,cada sema
+				na, cada mes (indep.del tamaño)
+
+				ej:
+
+			/var/log/auth.log {
+					rotate 5
+					size 1M
+					daily <---se rota diar.
+						indep.si se alc
+						1M de tamaño
+					...
+					}
+
+
+  compress <---------- comprime los ficheros rotados (gzip)
+			añadiendo al nombre de los ficheros
+			rotados .gz
+   delaycompress <----- (solo con compress)no se comprimen de
+			forma inmediata los ficheros, sino en
+			la siguiente rotacion (para evitar
+			perdidas de informacion en los fich.
+			rotados cuando en la operacion de 
+			compresion)
+			
+  nocompress <-------- no se comprimen ficheros rotados
+
+  notifempty <-------- no rota el fichero LOG si esta vacio
+			(aunque le toque por tiempo)
+  [not]missingok <---- si falta un fichero a rotar no se rota
+			(notmissingok)
+  
+  postrotate/prerotate <--- conjunto de comando(s) q se ejecutan
+	comando		  despues de cada rotacion o antes de 
+	comando		  cada rotacion(por cada fichero rotado)
+	...			OJO!!!
+   endscript		 [] []v1 []v2 ---> [] []v1 []v2 []v3
+					como se rota 3 veces
+					se ejecutaria los coman
+					dos 3 veces (despues o
+					antes)
+  sharedscripts <--------- para evitar q se ejecuten los coman
+			dos del postrotate/prerotate por cada
+			rotacion y solo se ejecuten UNA VEZ
+
+ create [permisos] usuario grupo <---- especificas el usuario
+				   y grupo dueño de los ficheros
+				  LOG rotados; si especificas
+				 permisos, los crearia con esos
+				 permisos, sino con los permisos
+				 por defecto para ficheros (644)
+
+ej:  fichero log de mensajes de autentificacion de RSYSLOGD
+
+	/var/log/auth.log {
+	        rotate 4
+	        weekly <----- se rotan cada 7 dias
+	        missingok
+	        notifempty
+	        compress
+	        delaycompress
+	        sharedscripts
+	        postrotate
+	                reload rsyslog >/dev/null 2>&1 || true
+	        endscript
+	}
+
+va a /var/lib/lograte/status <--- busca la linea q contenga
+				 /var/log/auth.log y saca fecha
+				y hora ultima rotacion:
+
+		"/var/log/auth.log" 2017-2-21-8:25:40
+
+lo compara fecha y hora de hoy: 2017-2-22-21:02 
+¿¿ han transcurrido 7 dias (weekly) ?? NO, pues no se rota...
+
+---------------------------------------------------
+PRACTICA: rotacion de auth.log por tamaño
+---------------------------------------------------
+1º) voy a /etc/logrotate.d   y edito fichero rsyslog
+y quito del conjunto de ficheros log con reglas comunes
+el /var/log/auth.log 
+
+/var/log/mail.info
+/var/log/mail.warn
+/var/log/mail.err
+/var/log/mail.log
+/var/log/daemon.log
+/var/log/kern.log
+/var/log/auth.log <----- la quito....
+/var/log/user.log
+/var/log/lpr.log
+/var/log/cron.log
+/var/log/debug
+/var/log/messages
+{
+	...
+}
+
+y pongo esto al principio del fichero:
+
+	/var/log/auth.log {
+		dateext
+	        rotate 2
+	        daily 
+		size 100k
+	        missingok
+	        notifempty
+	        compress
+	        delaycompress
+	        sharedscripts
+	        postrotate
+	                reload rsyslog >/dev/null 2>&1 || true
+	        endscript
+	}
+
+2º ejecuto logrotate para q coja los nuevos cambios del fichero
+ de configuracion (como root):
+
+	logrotate /etc/logrotate.conf
+
+
+ hay q hacer q rsyslog capture los mensajes de los demonios de
+ tipo auth y los mande al fichero /var/log/auth.log
+ En fichero de reglas /etc/rsyslog.d <--- 50-default.conf
+ poner esta linea:
+	auth,authpriv.*		/var/log/auth.log
+
+ guardar y reiniciar servicio rsyslogd:
+
+	systemctl restart rsyslog.service
+	initctl restart rsyslog
+	/etc/init.d/rsyslog restart
+
+
+3º para provocar rotacion, hacer un script con un bucle infinito
+q genere mensajes como si fuesen provocados por demonios de tipo
+auth:
+
+	#!/bin/bash
+	contador=1
+	while true
+	do
+	  echo "...mandando mensaje: $contador...."
+	  logger -p auth.err -t "[soy yo]" "===> mensaje de relleno $RANDOM <==="
+	  contador=$(( $contador+1 ))
+	  sleep 1s			
+	done
+
+4º) ejecutar el script e ir a /var/log y ver si se provoca rotacion de auth.log cuando alcance los 100k
+
+	cd /var/log
+	while true; do clear; ls -l auth.* ; sleep 1s; done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+	
