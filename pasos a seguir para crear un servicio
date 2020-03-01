@@ -1,0 +1,37 @@
+#script que te abre el terminal para meterlo en /lib/systemd/system como servicio ( #! /bin/sh) 
+#root@edhost:/lib/systemd/system# nano kkk.service
+
+[Unit]
+Description=Practica de servicios systemd
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+EnviromentFile=-/home/alumnot/Documentos/terminal.sh
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/bin/bash /home/alumnot/Documentos/terminal.sh
+
+
+[Install]
+WantedBy=multi-user.target
+
+
+#root@edhost:/lib/systemd/system# systemctl enable kkk.service 
+#root@edhost:/lib/systemd/system# systemctl daemon-reload
+#root@edhost:/lib/systemd/system# systemctl start kkk.service 
+#root@edhost:/lib/systemd/system# systemctl status kkk.service 
+
+
+
+******************************
+antiguo init 
+cp /home/alumnot/Documentos/terminal.sh /etc/init.d --> mover script al path del antiguo init
+
+ln -s /etc/init.d/terminal.sh /etc/rc5.d/S01terminal.sh --> crear el puntero softlink
+
+
+cd /etc/rc5.d --> comprobar que se ha creado el puntero
+
